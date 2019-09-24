@@ -3,6 +3,7 @@ package com.example.inclass05;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
@@ -36,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     TextView tvKeyword;
     String[] imageURLs = null;
     int currIndex = 0;
+    ProgressDialog progressDialog;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,33 +49,48 @@ public class MainActivity extends AppCompatActivity {
         next = findViewById(R.id.imageViewNext);
         tvKeyword = findViewById(R.id.textViewKeyword);
         btnGo = findViewById(R.id.buttonGo);
+        prev.setEnabled(false);
+        next.setEnabled(false);
 
         btnGo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                new getKeyword().execute("http://dev.theappsdr.com/apis/photos/keywords.php");
+                if(isConnected()){
+                    new getKeyword().execute("http://dev.theappsdr.com/apis/photos/keywords.php");
+                } else {
+                    Toast.makeText(MainActivity.this, "No Active Internet Connecion", Toast.LENGTH_SHORT).show();
+                }
             }
         });
         prev.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                currIndex--;
-                if(currIndex<0)
-                    currIndex=imageURLs.length -1;
-                new GetImageAsync(mainImage).execute(imageURLs[currIndex]);
+                if(imageURLs!=null){
+                    currIndex--;
+                    if(currIndex<0)
+                        currIndex=imageURLs.length -1;
+                    new GetImageAsync(mainImage).execute(imageURLs[currIndex]);
+                } else {
+                    Toast.makeText(MainActivity.this, "No Images Found", Toast.LENGTH_SHORT).show();
+                }
+
             }
         });
 
         next.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                currIndex++;
-                if(currIndex>(imageURLs.length-1))
-                    currIndex=0;
-                new GetImageAsync(mainImage).execute(imageURLs[currIndex]);
+                if(imageURLs != null) {
+                    currIndex++;
+                    if(currIndex>(imageURLs.length-1))
+                        currIndex=0;
+                    new GetImageAsync(mainImage).execute(imageURLs[currIndex]);
+                } else {
+                    Toast.makeText(MainActivity.this, "No Images Found", Toast.LENGTH_SHORT).show();
+                }
             }
         });
-        
+
     }
 
     private boolean isConnected() {
@@ -130,7 +147,6 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(String s) {
-            super.onPostExecute(s);
             final String[] temp = s.split(";");
             AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
             builder.setTitle("Choose item");
@@ -139,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     String url = "http://dev.theappsdr.com/apis/photos/index.php" + "?" +"keyword="+temp[which];
-//                    Toast.makeText(MainActivity.this, temp[which], Toast.LENGTH_SHORT).show();
+                    tvKeyword.setText(temp[which]);
                     new getImageURL().execute(url);
                 }
             });
@@ -192,13 +208,34 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute(String s) {
             imageURLs = s.split(" ");
-            new GetImageAsync(mainImage).execute(imageURLs[currIndex]);
+            currIndex = 0;
+            Log.d("demo",s);
+            if(s.isEmpty()){
+                mainImage.setImageDrawable(null);
+                Toast.makeText(MainActivity.this, "No Images Found", Toast.LENGTH_SHORT).show();
+                prev.setEnabled(false);
+                next.setEnabled(false);
+            } else {
+                prev.setEnabled(true);
+                next.setEnabled(true);
+                new GetImageAsync(mainImage).execute(imageURLs[currIndex]);
+            }
         }
     }
 
     private class GetImageAsync extends AsyncTask<String, Void, Void> {
         ImageView imageView;
         Bitmap bitmap = null;
+
+        @Override
+        protected void onPreExecute() {
+            progressDialog = new ProgressDialog(MainActivity.this);
+            progressDialog.setMessage("Loading");
+            progressDialog.setMax(10);
+            progressDialog.setProgressStyle(ProgressDialog.STYLE_SPINNER);
+            progressDialog.setCancelable(false);
+            progressDialog.show();
+        }
 
         public GetImageAsync(ImageView iv) {
             imageView = iv;
@@ -231,6 +268,7 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         protected void onPostExecute(Void aVoid) {
+            progressDialog.dismiss();
             if (bitmap != null && imageView != null) {
                 imageView.setImageBitmap(bitmap);
             } else  {
